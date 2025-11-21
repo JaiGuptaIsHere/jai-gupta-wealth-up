@@ -1,0 +1,7 @@
+name,email,age,department
+John Doe,john@company.com,30,Engineering
+Jane Smith,jane@company.com,25,Sales
+Bob Wilson,bob@company.com,invalid_age,Marketing
+Alice Johnson,alice@company.com,28,Engineering
+Charlie Brown,not-an-email,35,Sales
+Eve Davis,eve@company.com,29,Marketing
