@@ -17,7 +17,6 @@ class JobQueue {
     });
   }
 
-  // Add a job to the queue
   async enqueueJob(fileId, fileName) {
     const jobId = uuidv4();
     
@@ -30,7 +29,6 @@ class JobQueue {
     
     await job.save();
     
-    // Start processing if not already running
     if (!this.isProcessing) {
       this.processQueue();
     }
@@ -38,44 +36,35 @@ class JobQueue {
     return job;
   }
 
-  // Main queue processing loop
   async processQueue() {
     if (this.isProcessing) return;
     
     this.isProcessing = true;
     
     while (true) {
-      // Get next pending job
       const job = await Job.findOne({ status: 'pending' }).sort({ createdAt: 1 });
       
       if (!job) {
-        // No more jobs, stop processing
         this.isProcessing = false;
         break;
       }
       
-      // Process the job
       await this.processJob(job);
     }
   }
 
-  // Process a single job
   async processJob(job) {
     try {
       console.log(`Processing job ${job.jobId} for file ${job.fileName}`);
       
-      // Update job status to processing
       job.status = 'processing';
       job.startedAt = new Date();
       await job.save();
       
-      // Download file from S3
       const fileContent = await this.downloadFromS3(job.fileName);
       
-      // Process the file
       const result = await this.processFileContent(fileContent, job.fileId);
       
-      // Update job as completed
       job.status = 'completed';
       job.completedAt = new Date();
       job.result = result;
@@ -86,7 +75,6 @@ class JobQueue {
     } catch (error) {
       console.error(`Job ${job.jobId} failed:`, error);
       
-      // Update job as failed
       job.status = 'failed';
       job.completedAt = new Date();
       job.error = error.message;
@@ -94,7 +82,6 @@ class JobQueue {
     }
   }
 
-  // Download file from S3
 async downloadFromS3(fileName) {
   const command = new GetObjectCommand({
     Bucket: process.env.AWS_BUCKET_NAME,
@@ -102,10 +89,9 @@ async downloadFromS3(fileName) {
   });
   
   const response = await this.s3Client.send(command);
-  return response.Body; // Return the stream, don't convert to string!
+  return response.Body; 
 }
 
-  // Process file content and insert into MongoDB
  async processFileContent(fileStream, fileId) {
   let totalLines = 0;
   let successfulInserts = 0;
@@ -124,14 +110,12 @@ async downloadFromS3(fileName) {
   
   let isFirstLine = true;
 
-  // Create readline interface
   const rl = readline.createInterface({
     input: fileStream,
     crlfDelay: Infinity
   });
 
   for await (const line of rl) {
-    // Skip header line
     if (isFirstLine) {
       isFirstLine = false;
       continue;
@@ -139,7 +123,6 @@ async downloadFromS3(fileName) {
 
     const trimmedLine = line.trim();
     
-    // Skip empty lines (don't count as errors)
     if (!trimmedLine || trimmedLine === ',,,') {
       continue;
     }
@@ -147,7 +130,6 @@ async downloadFromS3(fileName) {
     totalLines++;
 
     try {
-      // Parse CSV line - handle quoted fields
       const fields = this.parseCSVLine(trimmedLine);
       
       if (fields.length < 2) {
@@ -157,7 +139,6 @@ async downloadFromS3(fileName) {
       
       const [name, email, age, department] = fields;
       
-      // Validate required fields
       if (!name || name.trim() === '') {
         errorCategories.missingFields++;
         throw new Error('Name is required');
@@ -168,14 +149,12 @@ async downloadFromS3(fileName) {
         throw new Error('Email is required');
       }
       
-      // Validate email format (more robust)
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email.trim())) {
         errorCategories.invalidEmail++;
         throw new Error(`Invalid email format: ${email}`);
       }
       
-      // Parse and validate age (optional but must be valid if provided)
       let parsedAge = null;
       if (age && age.trim() !== '') {
         parsedAge = parseInt(age.trim());
@@ -189,7 +168,6 @@ async downloadFromS3(fileName) {
         }
       }
       
-      // Clean and prepare record
       const record = {
         name: name.trim(),
         email: email.trim().toLowerCase(),
@@ -199,10 +177,8 @@ async downloadFromS3(fileName) {
         processedAt: new Date()
       };
       
-      // Add to batch
       batch.push(record);
       
-      // Insert batch when full
       if (batch.length >= BATCH_SIZE) {
         await Record.insertMany(batch);
         successfulInserts += batch.length;
@@ -213,7 +189,6 @@ async downloadFromS3(fileName) {
     } catch (error) {
       failedLines++;
       
-      // Track error categories
       if (!errorCategories.missingFields && 
           !errorCategories.invalidEmail && 
           !errorCategories.invalidAge && 
@@ -221,28 +196,24 @@ async downloadFromS3(fileName) {
         errorCategories.other++;
       }
       
-      // Keep detailed error log (limit to 50 for reporting)
       if (errors.length < 50) {
         errors.push({
-          line: totalLines + 1, // +1 for header
+          line: totalLines + 1, 
           error: error.message,
-          data: trimmedLine.substring(0, 100) // First 100 chars
+          data: trimmedLine.substring(0, 100) 
         });
       }
       
-      // Log to console for monitoring
       console.log(`✗ Line ${totalLines + 1} failed: ${error.message}`);
     }
   }
   
-  // Insert remaining records
   if (batch.length > 0) {
     await Record.insertMany(batch);
     successfulInserts += batch.length;
     console.log(`✓ Final batch inserted: ${successfulInserts} total records`);
   }
   
-  // Calculate success rate
   const successRate = totalLines > 0 
     ? Math.round((successfulInserts / totalLines) * 100) 
     : 0;
@@ -259,7 +230,7 @@ async downloadFromS3(fileName) {
     failedLines,
     successRate,
     errorCategories,
-    errors: errors.slice(0, 10), // Return first 10 detailed errors
+    errors: errors.slice(0, 10), 
     summary: `Processed ${successfulInserts}/${totalLines} records successfully (${successRate}% success rate)`
   };
 }
@@ -282,19 +253,16 @@ parseCSVLine(line) {
     }
   }
   
-  // Add last field
   fields.push(currentField);
   
   return fields;
 }
 
-  // Get job status
   async getJobStatus(jobId) {
     return await Job.findOne({ jobId });
   }
 }
 
-// Create singleton instance
 const jobQueue = new JobQueue();
 
 module.exports = jobQueue;

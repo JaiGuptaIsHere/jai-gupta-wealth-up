@@ -4,7 +4,6 @@ console.log('Creating messy test CSV file with various issues...');
 
 const ws = fs.createWriteStream('messy-test.csv');
 
-// Valid header
 ws.write('name,email,age,department\n');
 
 // Mix of good and bad data

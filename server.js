@@ -12,12 +12,10 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Configure AWS S3 Client
 const s3Client = new S3Client({
   region: process.env.AWS_REGION,
   credentials: {
@@ -26,7 +24,6 @@ const s3Client = new S3Client({
   }
 });
 
-// Configure Multer for memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -44,24 +41,14 @@ const upload = multer({
   }
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
-// Upload endpoint
 app.post('/upload', async (req, res) => {
   try {
     const result = await handleStreamingUpload(req);
 
-    // Save file metadata to MongoDB (if you added UploadedFile model)
-    // const uploadedFile = new UploadedFile({
-    //   fileId: result.fileId,
-    //   fileName: result.fileName,
-    //   originalName: result.originalName,
-    //   size: result.size
-    // });
-    // await uploadedFile.save();
 
     res.status(200).json({
       message: 'File uploaded successfully',
@@ -87,22 +74,11 @@ app.post('/upload', async (req, res) => {
   }
 });
 
-// NEW: Process file endpoint
 app.post('/process/:fileId', async (req, res) => {
   try {
     const { fileId } = req.params;
+    const fileName = `${fileId}-*`; 
     
-    // In a real app, you'd verify the file exists in S3 first
-    // For now, we'll assume the fileId is valid
-    
-    // Construct the expected filename (you might want to store this mapping)
-    // For simplicity, we'll just use the fileId pattern
-    const fileName = `${fileId}-*`; // This is a placeholder
-    
-    // Actually, we need to know the exact filename. Let's improve this:
-    // Option 1: Store filename mapping in database
-    // Option 2: Accept filename in request body
-    // Let's go with option 2 for simplicity
     
     const { fileName: providedFileName } = req.body;
     
@@ -113,7 +89,6 @@ app.post('/process/:fileId', async (req, res) => {
       });
     }
     
-    // Enqueue the job
     const job = await jobQueue.enqueueJob(fileId, providedFileName);
     
     res.status(202).json({
@@ -129,7 +104,6 @@ app.post('/process/:fileId', async (req, res) => {
   }
 });
 
-// NEW: Get job status endpoint
 app.get('/jobs/:jobId', async (req, res) => {
   try {
     const { jobId } = req.params;
@@ -158,7 +132,6 @@ app.get('/jobs/:jobId', async (req, res) => {
   }
 });
 
-// Error handling middleware
 app.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {

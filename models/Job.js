@@ -41,7 +41,6 @@ const jobSchema = new mongoose.Schema({
   completedAt: Date,
   error: String,
   
-  // NEW: Track restarts and recovery
   restartCount: {
     type: Number,
     default: 0

@@ -29,7 +29,6 @@ async function handleStreamingUpload(req) {
       const originalName = info.filename;
       const mimeType = info.mimeType;
 
-      // Validate file type
       if (!mimeType.includes('text') && 
           !mimeType.includes('csv') && 
           !originalName.endsWith('.txt') && 
@@ -45,18 +44,14 @@ async function handleStreamingUpload(req) {
 
       console.log(`Starting upload: ${fileName}`);
 
-      // Create pass-through stream
       const passThrough = new PassThrough();
       
-      // Count bytes
       file.on('data', (chunk) => {
         fileSize += chunk.length;
       });
 
-      // Pipe file to pass-through
       file.pipe(passThrough);
 
-      // Upload to S3
       const upload = new Upload({
         client: s3Client,
         params: {
@@ -67,7 +62,6 @@ async function handleStreamingUpload(req) {
         },
       });
 
-      // Track upload progress
       upload.on('httpUploadProgress', (progress) => {
         if (progress.total) {
           const percentage = Math.round((progress.loaded / progress.total) * 100);
@@ -75,7 +69,6 @@ async function handleStreamingUpload(req) {
         }
       });
 
-      // Store the upload promise
       uploadPromise = upload.done().then(() => {
         fileProcessed = true;
         console.log(`Upload complete: ${fileName} (${fileSize} bytes)`);
@@ -95,7 +88,6 @@ async function handleStreamingUpload(req) {
           return;
         }
 
-        // Wait for S3 upload to complete
         const result = await uploadPromise;
         resolve(result);
       } catch (error) {
